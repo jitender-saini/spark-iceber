@@ -1,8 +1,8 @@
 services:
-  jupyter-lab-spark:
-    container_name: jupyter-lab-spark
+  iceberg-spark:
+    container_name: iceberg-spark
     build:
-      context: jupyter-lab-spark
+      context: iceberg-spark
     networks:
       - local_env
     depends_on:
@@ -10,7 +10,7 @@ services:
     volumes:
       - ./.catalog:/home/iceberg/catalog
       - ./notebooks:/home/iceberg/notebooks
-      - ./glue/common/util:/home/iceberg/notebooks/util
+      - ./src/util:/home/iceberg/notebooks/util
     environment:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
