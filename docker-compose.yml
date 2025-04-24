@@ -1,0 +1,46 @@
+services:
+  jupyter-lab-spark:
+    container_name: jupyter-lab-spark
+    build:
+      context: jupyter-lab-spark
+    networks:
+      - local_env
+    depends_on:
+      - minio
+    volumes:
+      - ./.catalog:/home/iceberg/catalog
+      - ./notebooks:/home/iceberg/notebooks
+      - ./glue/common/util:/home/iceberg/notebooks/util
+    environment:
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_REGION=us-east-1
+    ports:
+      - 8888:8888
+      - 8080:8080
+      - 10000:10000
+      - 10001:10001
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    environment:
+      MINIO_DOMAIN: minio
+    ports:
+      - 9000:9000
+      - 9001:9001
+    command: [ "server", "/data", "--console-address", ":9001"]
+    volumes:
+      - ./.minio_data:/data
+    networks:
+      local_env:
+        aliases:
+          - datalake.minio
+
+
+volumes:
+  minio_data:
+
+networks:
+  local_env:
+    driver: bridge
