@@ -1,0 +1,13 @@
+line-length = 140
+indent-width = 4
+
+# https://docs.astral.sh/ruff/rules/
+[lint]
+select = ['F', 'E', 'I', 'N', 'UP', 'YTT', 'B', 'A', 'DTZ', 'C4', 'ARG', 'RUF', 'T20', 'PLR']
+ignore = ['PLR0913']
+
+[lint.per-file-ignores]
+'**/tests/**.py' = ['PLR2004']
+
+[format]
+quote-style = 'single'
