@@ -6,6 +6,7 @@ help:
 
 # Build docker image with a local tag
 build:
+    uv pip compile pyproject.toml -o requirements.txt && \
     docker compose build
 
 # Start jupyter lab server
