@@ -2,7 +2,7 @@ services:
   iceberg-spark:
     container_name: iceberg-spark
     build:
-      context: iceberg-spark
+      context: .
     networks:
       - local_env
     depends_on:

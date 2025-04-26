@@ -8,7 +8,7 @@ import polars as pl
 from gspread.utils import ValueInputOption
 from oauth2client.service_account import ServiceAccountCredentials
 
-from lazy import lazy
+from util.lazy import lazy
 
 from util.logging import get_logger
 

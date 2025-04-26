@@ -26,7 +26,7 @@ RUN pip3 install -r requirements.txt
 
 ENV SPARK_HOME=${SPARK_HOME:-"/opt/spark"}
 ENV PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip:$PYTHONPATH
-
+#ENV SPARK_DIST_CLASSPATH=$SPARK_HOME/jars/*:$SPARK_HOME/jars/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_2.12-${ICEBERG_VERSION}.jar:$SPARK_HOME/jars/duckdb_jdbc-1.1.0.jar
 WORKDIR ${SPARK_HOME}
 
 ENV SPARK_VERSION=3.5.5
