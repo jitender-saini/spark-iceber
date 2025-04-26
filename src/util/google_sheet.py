@@ -9,7 +9,6 @@ from gspread.utils import ValueInputOption
 from oauth2client.service_account import ServiceAccountCredentials
 
 from util.lazy import lazy
-
 from util.logging import get_logger
 
 log = get_logger(__name__)

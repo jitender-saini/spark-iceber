@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from contextlib import contextmanager
 from enum import Enum
-from typing import Optional, Any, Generator
+from typing import Any
 from urllib.parse import urlparse
 
 import sqlalchemy as sa
@@ -52,7 +53,7 @@ class PostgresConnection(Connection):
         return ConnectionType.POSTGRES
 
     @contextmanager
-    def get_sqlalchemy_engine(self) -> Generator[sa.Engine, Any, None]:
+    def get_sqlalchemy_engine(self) -> Generator[sa.Engine, Any]:
         engine = self._create_engine()
         try:
             yield engine
@@ -65,7 +66,7 @@ class PostgresConnection(Connection):
 
 
 class DuckDBConnection(Connection):
-    def __init__(self, path: Optional[str]):
+    def __init__(self, path: str | None):
         self.path = path
 
     @property
@@ -73,7 +74,7 @@ class DuckDBConnection(Connection):
         return ConnectionType.DUCKDB
 
     @contextmanager
-    def get_sqlalchemy_engine(self) -> Generator[sa.Engine, Any, None]:
+    def get_sqlalchemy_engine(self) -> Generator[sa.Engine, Any]:
         engine = self._create_engine()
         try:
             yield engine
