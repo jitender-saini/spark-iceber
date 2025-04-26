@@ -9,7 +9,7 @@ build:
     docker compose build
 
 # Start jupyter lab server
-jupyter-lab:
+jlab:
     docker compose up
 
 # Lint Python files
@@ -25,7 +25,7 @@ clean:
     rm -rf ./build ./dist ./src/*.egg-info
 
 # Submit an Spark job
-spark-submit script *args="": build-python
+spark-submit script *args="":
     docker compose run --rm {{ spark_submit_service }} spark-submit "{{ script }}" {{ args }}
 
 # Run bash inside Docker Compose spark-submit service
