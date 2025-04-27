@@ -8,9 +8,6 @@ from urllib.parse import urlparse
 import sqlalchemy as sa
 
 from util.credentials import Credentials
-from util.logging import get_logger
-
-log = get_logger(__name__)
 
 
 class ConnectionFactory:

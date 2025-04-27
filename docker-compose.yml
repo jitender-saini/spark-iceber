@@ -9,6 +9,8 @@ services:
       - minio
     volumes:
       - ./.catalog:/home/iceberg/catalog
+      - ./.db:/home/iceberg/db
+      - ./.data:/home/iceberg/notebooks/data
       - ./notebooks:/home/iceberg/notebooks
       - ./src/util:/home/iceberg/notebooks/util
     environment:

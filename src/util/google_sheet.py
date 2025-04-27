@@ -43,7 +43,7 @@ class RemoteGoogleSheet(GoogleSheet):
         return gspread.authorize(credentials)
 
     def _get_spreadsheet(self, url: str) -> gspread.Spreadsheet:
-        return self._client.open_by_key(self._get_file_id_from_url(url))
+        return self._client().open_by_key(self._get_file_id_from_url(url))
 
     def get_worksheet(self, url: str, worksheet_name: str) -> list[list[str]]:
         spreadsheet = self._get_spreadsheet(url)

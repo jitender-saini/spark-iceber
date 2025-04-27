@@ -1,5 +1,5 @@
-JDBC_CATALOG_DIR = '/home/glue_user/workspace/catalog'
-METADATA_DIR = '/home/glue_user/workspace/metadata'
+JDBC_CATALOG_DIR = '/home/iceberg/catalog'
+METADATA_DIR = '/home/iceberg/metadata'
 
 MINIO_HOST = 'minio'
 MINIO_PORT = 9000

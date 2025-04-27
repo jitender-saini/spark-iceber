@@ -13,6 +13,10 @@ build:
 jlab:
     docker compose up
 
+# Start jupyter lab using without docker and spark
+uv-jlab:
+    uv run --with jupyter jupyter lab
+
 # Lint Python files
 lint-fix:
     ruff check --fix

@@ -13,26 +13,18 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# # Install AWS CLI
-# RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-#  && unzip awscliv2.zip \
-#  && sudo ./aws/install \
-#  && rm awscliv2.zip \
-#  && rm -rf aws/
-
-# Install Jupyter and other Python deps
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
 ENV SPARK_HOME=${SPARK_HOME:-"/opt/spark"}
 ENV PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip:$PYTHONPATH
-#ENV SPARK_DIST_CLASSPATH=$SPARK_HOME/jars/*:$SPARK_HOME/jars/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_2.12-${ICEBERG_VERSION}.jar:$SPARK_HOME/jars/duckdb_jdbc-1.1.0.jar
 WORKDIR ${SPARK_HOME}
 
 ENV SPARK_VERSION=3.5.5
 ENV SPARK_MAJOR_VERSION=3.5
 ENV ICEBERG_VERSION=1.8.1
 ENV PATH="/root/.cargo/bin:${PATH}"
+
 # Download Spark
 RUN mkdir -p ${SPARK_HOME} \
  && curl https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz -o spark-${SPARK_VERSION}-bin-hadoop3.tgz \
@@ -42,8 +34,8 @@ RUN mkdir -p ${SPARK_HOME} \
 # Download Iceberg Spark runtime
 RUN curl https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_2.12/${ICEBERG_VERSION}/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_2.12-${ICEBERG_VERSION}.jar -Lo /opt/spark/jars/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_2.12-${ICEBERG_VERSION}.jar
 
-# # Download AWS bundle
-# RUN curl -s https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_VERSION}/iceberg-aws-bundle-${ICEBERG_VERSION}.jar -Lo /opt/spark/jars/iceberg-aws-bundle-${ICEBERG_VERSION}.jar
+ # Download AWS bundle
+ RUN curl -s https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_VERSION}/iceberg-aws-bundle-${ICEBERG_VERSION}.jar -Lo /opt/spark/jars/iceberg-aws-bundle-${ICEBERG_VERSION}.jar
 
 # Download DuckDB JDBC driver (for Spark Iceberg catalog)
 RUN curl -s https://repo1.maven.org/maven2/org/duckdb/duckdb_jdbc/1.1.0/duckdb_jdbc-1.1.0.jar -Lo /opt/spark/jars/duckdb_jdbc-1.1.0.jar
