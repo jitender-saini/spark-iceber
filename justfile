@@ -56,7 +56,10 @@ login-ghcr:
 
 # Run python script inside the iceberg-spark container
 python-submit script *args="":
-    docker run -i --rm -v $(pwd)/.app_data:/home/iceberg/app iceberg-spark python "{{ script }}" {{args}}
+    docker run -i --rm \
+    -v $(pwd)/.app_data:/home/iceberg/app \
+    -v $(pwd)/src:/home/iceberg/src \
+    iceberg-spark python "{{ script }}" {{args}}
 
 #Build docker image iceberg-spark
 dbuild:

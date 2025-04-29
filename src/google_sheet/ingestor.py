@@ -61,11 +61,11 @@ class IngestJob:
     def get_worksheet_df(self) -> pl.DataFrame:
         data = self.google_sheet.get_worksheet(str(self.config.sheet_url), self.config.worksheet_name)
         df = pl.DataFrame(data[self.config.sheet_data_row_num :], schema=data[self.config.sheet_header_row_num], orient='row')
-        if self.custom_processor:
-            df = self.custom_processor(df)
         if self.config.generate_id:
             df = df.with_columns(pl.struct(df.columns).map_elements(self._generate_unique_id).alias('id'))
         df = df.rename(mapping=self._rename_cols(df.columns))
+        if self.custom_processor:
+            df = self.custom_processor(df)
         if len(df.columns) != len(set(df.columns)):
             duplicates = [col for col in df.columns if df.columns.count(col) > 1]
             raise ValueError(f'Found duplicate columns: {duplicates}')
@@ -91,12 +91,29 @@ class IngestJob:
         return hashlib.md5(id_str.encode()).hexdigest()
 
 
+def transform_data(df: pl.DataFrame) -> pl.DataFrame:
+    return df.with_columns(
+        pl.col('average_cost').str.replace_all('₹', '').cast(pl.Int32, strict=False),
+        pl.col('minimum_order').str.replace_all('₹', '').cast(pl.Int32, strict=False),
+        pl.col('rating').cast(pl.Float64, strict=False),
+        pl.col('votes').cast(pl.Float64, strict=False),
+        pl.col('reviews').cast(pl.Float64, strict=False),
+    )
+
+
 @log_execution_time(log)
 def main(config_uri: str) -> None:
     config_repo = ConfigFactory.from_uri(config_uri)
     config = config_repo.get(JobConfig)
     google_sheet = GoogleSheetFactory.from_credential_json(config.gs_secret_path)
     conn = ConnectionFactory.from_uri(str(config.duckdb_uri))
+    log.info('Job args: %s', config)
+    if not config.is_active:
+        log.info('Job is not active, skipping')
+        return
+    custom_processor = None
+    if config.table_name == 'elt.restaurant':
+        custom_processor = transform_data
     with conn.get_sqlalchemy_engine() as engine:
         table_ingestor = DuckDBTableIngestor(
             engine=engine,
@@ -105,7 +122,7 @@ def main(config_uri: str) -> None:
             primary_keys=config.primary_keys,
             range_column=config.range_column,
         )
-        job = IngestJob(google_sheet=google_sheet, config=config, table_ingestor=table_ingestor)
+        job = IngestJob(google_sheet=google_sheet, config=config, table_ingestor=table_ingestor, custom_processor=custom_processor)
         job.run()
 
 
