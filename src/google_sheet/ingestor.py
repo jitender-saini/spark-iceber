@@ -3,7 +3,6 @@ import re
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
-from pathlib import Path
 
 import polars as pl
 from pydantic import AnyUrl, BaseModel
@@ -31,7 +30,7 @@ class JobConfig(BaseModel):
     sheet_data_row_num: int = 1
     sheet_header_row_num: int = 0
     duckdb_uri: AnyUrl
-    gs_secret_path: Path
+    gs_secret_path: str
 
 
 class IngestJob:
@@ -96,7 +95,7 @@ class IngestJob:
 def main(config_uri: str) -> None:
     config_repo = ConfigFactory.from_uri(config_uri)
     config = config_repo.get(JobConfig)
-    google_sheet = GoogleSheetFactory.from_credential_json(str(config.gs_secret_path))
+    google_sheet = GoogleSheetFactory.from_credential_json(config.gs_secret_path)
     conn = ConnectionFactory.from_uri(str(config.duckdb_uri))
     with conn.get_sqlalchemy_engine() as engine:
         table_ingestor = DuckDBTableIngestor(
