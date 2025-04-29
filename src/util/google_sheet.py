@@ -1,7 +1,6 @@
 import json
 import re
 from abc import ABC, abstractmethod
-from collections import defaultdict
 
 import gspread
 import polars as pl
@@ -55,7 +54,7 @@ class RemoteGoogleSheet(GoogleSheet):
         spreadsheet = self._get_spreadsheet(url)
         worksheet = spreadsheet.worksheet(worksheet_name)
         worksheet.clear()
-        formatted_df = format_temporal_columns(df)
+        formatted_df = self._format_temporal_columns(df)
         worksheet.update([formatted_df.columns, *formatted_df.rows()], value_input_option=ValueInputOption.user_entered)
 
     @staticmethod
@@ -65,22 +64,10 @@ class RemoteGoogleSheet(GoogleSheet):
             return match.group(1)
         raise ValueError('Invalid Google Sheet URL')
 
-
-class FakeGoogleSheet(GoogleSheet):
-    def __init__(self):
-        self.spreadsheets = defaultdict(dict)
-
-    def get_worksheet(self, url: str, worksheet_name: str) -> list[list[str]]:
-        df = self.spreadsheets[url][worksheet_name]
-        return [df.columns, *[list(r) for r in df.rows()]]
-
-    def update_worksheet(self, url: str, worksheet_name: str, df: pl.DataFrame) -> None:
-        self.spreadsheets[url][worksheet_name] = format_temporal_columns(df)
-
-
-def format_temporal_columns(df: pl.DataFrame) -> pl.DataFrame:
-    return df.with_columns(
-        [pl.col(col).dt.strftime('%Y-%m-%d') for col in df.select(pl.col(pl.Date)).columns],
-    ).with_columns(
-        [pl.col(col).dt.strftime('%Y-%m-%d %H:%M:%S') for col in df.select(pl.col(pl.Datetime)).columns],
-    )
+    @staticmethod
+    def _format_temporal_columns(df: pl.DataFrame) -> pl.DataFrame:
+        return df.with_columns(
+            [pl.col(col).dt.strftime('%Y-%m-%d') for col in df.select(pl.col(pl.Date)).columns],
+        ).with_columns(
+            [pl.col(col).dt.strftime('%Y-%m-%d %H:%M:%S') for col in df.select(pl.col(pl.Datetime)).columns],
+        )

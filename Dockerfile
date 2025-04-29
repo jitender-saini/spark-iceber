@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
 ENV SPARK_HOME=${SPARK_HOME:-"/opt/spark"}
-ENV PYTHONPATH=$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip:$PYTHONPATH
+ENV PYTHONPATH=/home/iceberg/src:$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip:$PYTHONPATH
 WORKDIR ${SPARK_HOME}
 
 ENV SPARK_VERSION=3.5.5
@@ -63,7 +63,11 @@ RUN mkdir -p /root/.ipython/profile_default/startup
 COPY ipython/startup/00-prettytables.py /root/.ipython/profile_default/startup
 COPY ipython/startup/README /root/.ipython/profile_default/startup
 
+
+RUN mkdir -p /home/iceberg/src
+COPY src/ /home/iceberg/src
+
 COPY entrypoint.sh .
 
-ENTRYPOINT ["./entrypoint.sh"]
+#ENTRYPOINT ["./entrypoint.sh"]
 CMD ["notebook"]

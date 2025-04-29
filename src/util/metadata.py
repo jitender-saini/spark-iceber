@@ -10,7 +10,7 @@ class Metadata:
     table_name: str
     is_active: bool
     bookmark: str
-    condition_column: str | None
+    range_column: str | None
     primary_keys: list[str] | None
     source_schema_table: str | None
     bucket: str | None
@@ -39,7 +39,7 @@ def convert_to_metadata(record: dict) -> Metadata:
         schema_name=schema_name,
         table_name=table_name,
         bookmark=record['bookmark'],
-        condition_column=record.get('condition_col'),
+        range_column=record.get('range_column'),
         primary_keys=record['primary_key'].split(',') if 'primary_key' in record else None,
         source_schema_table=record.get('source_schema_table'),
         is_active=record.get('is_active'),
@@ -85,7 +85,7 @@ class FileMetadataRepository(MetadataRepository):
     def get_by_job_name(self, job_name: str) -> list[Metadata]:
         with open(self.file_name) as file:
             items = json.load(file)
-        filtered_data = [item for item in items if item.get('Job_name') == job_name]
+        filtered_data = [item for item in items if item.get('job_name') == job_name]
         return [convert_to_metadata(item) for item in filtered_data]
 
     def get_by_name(self, table_name: str) -> Metadata | None:

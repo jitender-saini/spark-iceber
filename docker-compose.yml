@@ -8,11 +8,7 @@ services:
     depends_on:
       - minio
     volumes:
-      - ./.catalog:/home/iceberg/catalog
-      - ./.db:/home/iceberg/db
-      - ./.data:/home/iceberg/notebooks/data
-      - ./notebooks:/home/iceberg/notebooks
-      - ./src/util:/home/iceberg/notebooks/util
+      - ./.app_data:/home/iceberg/app
     environment:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
@@ -22,6 +18,8 @@ services:
       - 8080:8080
       - 10000:10000
       - 10001:10001
+    env_file:
+      - ./.env.dev
 
   minio:
     image: minio/minio

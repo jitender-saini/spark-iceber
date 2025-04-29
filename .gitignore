@@ -17,3 +17,8 @@ wheels/
 .db
 .logs
 .metadata
+.app_data
+
+
+# dotenv environment variable files
+.env.dev
