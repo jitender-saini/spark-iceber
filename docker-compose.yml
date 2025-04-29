@@ -9,6 +9,7 @@ services:
       - minio
     volumes:
       - ./.app_data:/home/iceberg/app
+      - ./notebooks:/home/iceberg/notebooks
     environment:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin

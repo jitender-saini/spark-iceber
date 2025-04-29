@@ -54,7 +54,7 @@ class IngestJob:
         if df.is_empty():
             log.info('No data to ingest')
             return
-        df.write_parquet(f'{TEMP_PATH}/{self.config.table_name}.parquet')
+        df.write_parquet(f'{TEMP_PATH}/{self.config.table_name.replace(".", "_")}.parquet')
         log.info('Saved temp files!')
         self.table_ingestor.execute(TEMP_PATH)
         log.info(f'Ingested data for table {self.config.table_name}!')
