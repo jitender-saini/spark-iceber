@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import polars as pl
 from pydantic import AnyUrl, BaseModel
 
-from util.config import ConfigFactory
+from util.config import ConfigFactory, UpdateBookmark
 from util.connection_factory import ConnectionFactory
 from util.google_sheet import GoogleSheet, GoogleSheetFactory
 from util.local_env import TEMP_PATH
@@ -39,12 +39,14 @@ class IngestJob:
         google_sheet: GoogleSheet,
         config: JobConfig,
         table_ingestor: DuckDBTableIngestor,
+        update_bookmark: UpdateBookmark,
         custom_processor: Callable[[pl.DataFrame], pl.DataFrame] | None = None,
     ):
         self.google_sheet = google_sheet
         self.utc_now = datetime.now(UTC)
         self.config = config
         self.table_ingestor = table_ingestor
+        self.update_bookmark = update_bookmark
         self.custom_processor = custom_processor
 
     def run(self) -> None:
@@ -57,6 +59,8 @@ class IngestJob:
         log.info('Saved temp files!')
         self.table_ingestor.execute(TEMP_PATH)
         log.info(f'Ingested data for table {self.config.table_name}!')
+        self.update_bookmark(self.utc_now)
+        log.info('Updated bookmark: %s', self.utc_now)
 
     def get_worksheet_df(self) -> pl.DataFrame:
         data = self.google_sheet.get_worksheet(str(self.config.sheet_url), self.config.worksheet_name)
@@ -112,7 +116,7 @@ def main(config_uri: str) -> None:
         log.info('Job is not active, skipping')
         return
     custom_processor = None
-    if config.table_name == 'elt.restaurant':
+    if config.table_name == 'etl.restaurant':
         custom_processor = transform_data
     with conn.get_sqlalchemy_engine() as engine:
         table_ingestor = DuckDBTableIngestor(
@@ -122,7 +126,13 @@ def main(config_uri: str) -> None:
             primary_keys=config.primary_keys,
             range_column=config.range_column,
         )
-        job = IngestJob(google_sheet=google_sheet, config=config, table_ingestor=table_ingestor, custom_processor=custom_processor)
+        job = IngestJob(
+            google_sheet=google_sheet,
+            config=config,
+            table_ingestor=table_ingestor,
+            update_bookmark=config_repo.update,
+            custom_processor=custom_processor,
+        )
         job.run()
 
 

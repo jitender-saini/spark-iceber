@@ -16,6 +16,9 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
+RUN mkdir -p /home/iceberg/src
+COPY src/ /home/iceberg/src
+
 ENV SPARK_HOME=${SPARK_HOME:-"/opt/spark"}
 ENV PYTHONPATH=/home/iceberg/src:$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip:$PYTHONPATH
 WORKDIR ${SPARK_HOME}
