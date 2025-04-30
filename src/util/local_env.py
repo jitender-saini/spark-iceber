@@ -1,6 +1,7 @@
 import os
 
 CATALOG_URI = os.environ.get('CATALOG_URI', 'jdbc://minioadmin:minioadmin@minio:9000/datalake')
+JDBC_CATALOG_DIR = os.environ.get('JDBC_CATALOG_DIR', '/home/iceberg/app/.catalog')
 CONFIG_URI = os.environ.get('CONFIG_URI', 'file:///home/iceberg/app/.metadata')
 DUCKDB_URI = os.environ.get('DUCKDB_URI', 'duckdb:///home/iceberg/app/.db/db.duckdb')
 FILE_SYSTEM_URI = os.environ.get('FILE_SYSTEM_URI', 'file:///home/iceberg/app/.data')

@@ -1,4 +1,5 @@
 spark_submit_service := "iceberg-spark"
+python_submit_service := "etl-python"
 
 # Show help message
 help:
@@ -59,9 +60,9 @@ python-submit script *args="":
     docker run -i --rm \
     -v $(pwd)/.app_data:/home/iceberg/app \
     -v $(pwd)/src:/home/iceberg/src \
-    iceberg-spark python "{{ script }}" {{args}}
+    {{ python_submit_service }} python "{{ script }}" {{args}}
 
 #Build docker image iceberg-spark
 dbuild:
     uv pip compile pyproject.toml -o requirements.txt && \
-    docker build -t iceberg-spark .
+    docker build -t {{ python_submit_service }} .
