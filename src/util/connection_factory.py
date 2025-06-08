@@ -59,7 +59,7 @@ class PostgresConnection(Connection):
 
     def _create_engine(self):
         url = f'postgresql://{self.credentials.username}:{self.credentials.password}@{self.host}:{self.port}/{self.database}'
-        return sa.create_engine(url, pool_size=100, max_overflow=200, executemany_mode='batch', echo=False)
+        return sa.create_engine(url, pool_size=100, max_overflow=200, echo=False)
 
 
 class DuckDBConnection(Connection):

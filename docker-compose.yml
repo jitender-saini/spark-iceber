@@ -7,6 +7,7 @@ services:
       - local_env
     depends_on:
       - minio
+      - postgres
     volumes:
       - ./.app_data:/home/iceberg/app
       - ./src:/home/iceberg/src
@@ -40,9 +41,26 @@ services:
           - datalake.minio
 
 
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: etl_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./.app_data/.data:/home/iceberg/app/.data
+    networks:
+      - local_env
+
 volumes:
   minio_data:
+  postgres_data:
 
 networks:
   local_env:
     driver: bridge
+#    external: true

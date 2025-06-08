@@ -62,6 +62,15 @@ python-submit script *args="":
     -v $(pwd)/src:/home/iceberg/src \
     {{ python_submit_service }} python "{{ script }}" {{args}}
 
+
+python-submit-db script *args="":
+    docker run -i --rm \
+    --network iceberg-etl_local_env \
+    -v $(pwd)/.app_data:/home/iceberg/app \
+    -v $(pwd)/src:/home/iceberg/src \
+    {{ python_submit_service }} python "{{ script }}" {{args}}
+
+
 #Build docker image iceberg-spark
 dbuild:
     uv pip compile pyproject.toml -o requirements.txt && \

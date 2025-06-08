@@ -121,3 +121,32 @@ class DuckDBTableIngestor(TableIngestor):
                     AS FROM read_parquet(['{dump_path}/*.parquet']);
             """),
         ]
+
+
+# This class requires to create a temporary table in the database before running the execute command
+class PostgresTableIngestor(TableIngestor):
+    def __init__(
+        self,
+        engine: Engine,
+        table: str,
+        load_timestamp: datetime,
+        primary_keys: list[str],
+        range_column: str,
+    ):
+        super().__init__(engine, table, load_timestamp, primary_keys, range_column)
+
+    def _ingest_dump_to_temp_table(self, dump_path: str) -> None:
+        ingest_stmts = self._ingest_to_temp_table(dump_path)
+        statements = [
+            *ingest_stmts,
+            text(f'ALTER TABLE {self.temp_table} ADD load_timestamp TIMESTAMP NULL'),
+            text(f"UPDATE {self.temp_table} SET load_timestamp = '{self.load_timestamp.isoformat()}'"),
+            text('COMMIT;'),
+        ]
+
+        with self.engine.connect() as conn:
+            for statement in statements:
+                conn.execute(statement)
+
+    def _ingest_to_temp_table(self, dump_path: str) -> list[TextClause]:
+        return [text(f"COPY {self.temp_table} FROM '{dump_path}' DELIMITER '|' CSV HEADER;")]
