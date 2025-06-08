@@ -36,7 +36,7 @@ class TMDBApi:
                     break
 
                 all_result.extend(result)
-                log.info(f'Fetched page {current_page} with {len(result)} movies out of page {data["total_pages"]}')
+                log.info(f'Fetched page {current_page} with {len(result)} objects out of page {data["total_pages"]}')
 
                 if self._should_stop_pagination(current_page, max_pages, data['total_pages']):
                     break
@@ -87,6 +87,11 @@ class TMDBApi:
         return (max_pages and current_page >= max_pages) or current_page >= total_pages
 
     def fetch_movies(self, bookmark: datetime, max_pages: int, start_page: int = 1) -> list[dict]:
-        params = {'sort_by': 'primary_release_date', 'release_date.gte': str(bookmark.date())}
-        movies = self.fetch_api_data('discover/movie', params=params, start_page=start_page, max_pages=max_pages)
-        return movies
+        params = {'sort_by': 'primary_release_date.asc', 'release_date.gte': str(bookmark.date())}
+        data = self.fetch_api_data('discover/movie', params=params, start_page=start_page, max_pages=max_pages)
+        return data
+
+    def fetch_tv_shows(self, bookmark: datetime, max_pages: int, start_page: int = 1) -> list[dict]:
+        params = {'sort_by': 'first_air_date.asc', 'air_date.gte': str(bookmark.date())}
+        data = self.fetch_api_data('discover/tv', params=params, start_page=start_page, max_pages=max_pages)
+        return data
