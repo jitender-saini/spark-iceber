@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from http import HTTPStatus
 
 import requests
@@ -9,7 +10,10 @@ from util.logging import get_logger
 log = get_logger(__name__)
 
 
-class TMDB:
+# https://developer.themoviedb.org/reference/
+
+
+class TMDBApi:
     def __init__(self, api_key: str, temp_dir: str):
         self.api_key = api_key
         self.temp_dir = temp_dir
@@ -20,6 +24,7 @@ class TMDB:
         all_result: list[dict] = []
         current_page = start_page
         params = self._prepare_params(params, start_page)
+        log.info('Fetching data from TMDB API with params: %s', params)
 
         while True:
             try:
@@ -81,7 +86,7 @@ class TMDB:
     def _should_stop_pagination(current_page: int, max_pages: int, total_pages: int) -> bool:
         return (max_pages and current_page >= max_pages) or current_page >= total_pages
 
-    def fetch_movies(self, max_pages: int, start_page: int = 1) -> list[dict]:
-        params = {'include_adult': False, 'language': 'en-US', 'sort_by': 'popularity.desc'}
+    def fetch_movies(self, bookmark: datetime, max_pages: int, start_page: int = 1) -> list[dict]:
+        params = {'sort_by': 'primary_release_date', 'release_date.gte': str(bookmark.date())}
         movies = self.fetch_api_data('discover/movie', params=params, start_page=start_page, max_pages=max_pages)
         return movies
