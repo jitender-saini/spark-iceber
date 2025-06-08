@@ -1,20 +1,17 @@
 import hashlib
 import re
-import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 
 import polars as pl
 from pydantic import AnyUrl, BaseModel
 
-from util.config import ConfigFactory, UpdateBookmark
-from util.connection_factory import ConnectionFactory
-from util.google_sheet import GoogleSheet, GoogleSheetFactory
+from util.config import UpdateBookmark
+from util.google_sheet import GoogleSheet
 from util.local_env import TEMP_PATH
-from util.logging import configure_logging, get_logger, log_execution_time
+from util.logging import get_logger
 from util.table_copier import DuckDBTableIngestor
 
-configure_logging()
 log = get_logger(__name__)
 
 
@@ -30,7 +27,7 @@ class JobConfig(BaseModel):
     sheet_data_row_num: int = 1
     sheet_header_row_num: int = 0
     duckdb_uri: AnyUrl
-    gs_secret_path: str
+    gs_secret_name: str
 
 
 class IngestJob:
@@ -93,49 +90,3 @@ class IngestJob:
     def _generate_unique_id(row: tuple) -> str:
         id_str = '_'.join(str(i) for i in row)
         return hashlib.md5(id_str.encode()).hexdigest()
-
-
-def transform_data(df: pl.DataFrame) -> pl.DataFrame:
-    return df.with_columns(
-        pl.col('average_cost').str.replace_all('₹', '').cast(pl.Int32, strict=False),
-        pl.col('minimum_order').str.replace_all('₹', '').cast(pl.Int32, strict=False),
-        pl.col('rating').cast(pl.Float64, strict=False),
-        pl.col('votes').cast(pl.Float64, strict=False),
-        pl.col('reviews').cast(pl.Float64, strict=False),
-    )
-
-
-@log_execution_time(log)
-def main(config_uri: str) -> None:
-    config_repo = ConfigFactory.from_uri(config_uri)
-    config = config_repo.get(JobConfig)
-    google_sheet = GoogleSheetFactory.from_credential_json(config.gs_secret_path)
-    conn = ConnectionFactory.from_uri(str(config.duckdb_uri))
-    log.info('Job args: %s', config)
-    if not config.is_active:
-        log.info('Job is not active, skipping')
-        return
-    custom_processor = None
-    if config.table_name == 'etl.restaurant':
-        custom_processor = transform_data
-    with conn.get_sqlalchemy_engine() as engine:
-        table_ingestor = DuckDBTableIngestor(
-            engine=engine,
-            table=config.table_name,
-            load_timestamp=datetime.now(UTC),
-            primary_keys=config.primary_keys,
-            range_column=config.range_column,
-        )
-        job = IngestJob(
-            google_sheet=google_sheet,
-            config=config,
-            table_ingestor=table_ingestor,
-            update_bookmark=config_repo.update,
-            custom_processor=custom_processor,
-        )
-        job.run()
-
-
-if __name__ == '__main__':
-    # TODO: Add error alert
-    main(sys.argv[1])

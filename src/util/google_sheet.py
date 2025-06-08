@@ -1,4 +1,3 @@
-import json
 import re
 from abc import ABC, abstractmethod
 
@@ -15,9 +14,8 @@ log = get_logger(__name__)
 
 class GoogleSheetFactory:
     @classmethod
-    def from_credential_json(cls, creds_path: str) -> 'GoogleSheet':
-        with open(creds_path) as f:
-            return RemoteGoogleSheet(json.load(f))
+    def from_credential_json(cls, creds: dict) -> 'GoogleSheet':
+        return RemoteGoogleSheet(creds)
 
 
 class GoogleSheet(ABC):

@@ -1,15 +1,13 @@
-import sys
 from datetime import UTC, datetime
 
 import polars as pl
 from pydantic import AnyUrl, BaseModel
 
-from util.config import ConfigFactory, UpdateBookmark
-from util.connection_factory import Connection, ConnectionFactory
-from util.google_sheet import GoogleSheet, GoogleSheetFactory
-from util.logging import configure_logging, get_logger, log_execution_time
+from util.config import UpdateBookmark
+from util.connection_factory import Connection
+from util.google_sheet import GoogleSheet
+from util.logging import get_logger
 
-configure_logging()
 log = get_logger(__name__)
 
 
@@ -22,7 +20,7 @@ class JobConfig(BaseModel):
     where_clause: str | None = None
     limit: int | None = 1000
     duckdb_uri: AnyUrl
-    gs_secret_path: str
+    gs_secret_name: str
 
 
 class UploadJob:
@@ -61,25 +59,3 @@ class UploadJob:
     def _fetch_data(self, query: str) -> pl.DataFrame:
         with self.conn.get_sqlalchemy_engine() as engine, engine.connect() as conn:
             return pl.read_database(query=query, connection=conn)
-
-
-@log_execution_time(log)
-def main(config_uri: str) -> None:
-    config_repo = ConfigFactory.from_uri(config_uri)
-    config = config_repo.get(JobConfig)
-    google_sheet = GoogleSheetFactory.from_credential_json(config.gs_secret_path)
-    connection = ConnectionFactory.from_uri(str(config.duckdb_uri))
-
-    job = UploadJob(
-        google_sheet=google_sheet,
-        connection=connection,
-        config=config,
-        update_bookmark=config_repo.update,
-    )
-    job.run()
-
-
-if __name__ == '__main__':
-    # TODO: Add error alert
-    log.info('Starting uploader job, system args: %s', sys.argv)
-    main(sys.argv[1])
