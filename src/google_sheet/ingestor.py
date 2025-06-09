@@ -26,7 +26,7 @@ class JobConfig(BaseModel):
     generate_id: bool = False
     sheet_data_row_num: int = 1
     sheet_header_row_num: int = 0
-    duckdb_uri: AnyUrl
+    db_uri: AnyUrl
     gs_secret_name: str
 
 

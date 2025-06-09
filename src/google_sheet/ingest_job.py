@@ -31,7 +31,7 @@ def main(config_uri: str) -> None:
     config = config_repo.get(JobConfig)
     secret = SecretManager().get_secret(config.gs_secret_name)
     google_sheet = GoogleSheetFactory.from_credential_json(secret)
-    conn = ConnectionFactory.from_uri(str(config.duckdb_uri))
+    conn = ConnectionFactory.from_uri(str(config.db_uri))
     log.info('Job args: %s', config)
     if not config.is_active:
         log.info('Job is not active, skipping')

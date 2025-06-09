@@ -29,6 +29,7 @@ class ConnectionType(Enum):
 
 
 class Connection(ABC):
+    @property
     @abstractmethod
     def type(self) -> ConnectionType:
         pass

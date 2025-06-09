@@ -12,7 +12,7 @@ from util.connection_factory import ConnectionFactory
 from util.local_env import CONFIG_URI, TEMP_PATH
 from util.logging import configure_logging, get_logger
 from util.secret_manager import SecretManager
-from util.table_copier import PostgresTableIngestor
+from util.table_copier import TableIngestor, TableIngestorFactory
 
 configure_logging()
 log = get_logger(__name__)
@@ -50,7 +50,7 @@ class TMDBJob:
         self,
         metadata: JobMetadata,
         tmdb_api: TMDBApi,
-        table_ingestor: PostgresTableIngestor,
+        table_ingestor: TableIngestor,
         temp_dir: str,
         bookmark: datetime,
         update_bookmark: UpdateBookmark,
@@ -111,7 +111,8 @@ def main(config_uri: str = f'{CONFIG_URI}/tmdb_config.json'):
             continue
 
         with conn.get_sqlalchemy_engine() as engine:
-            table_ingestor = PostgresTableIngestor(
+            table_ingestor = TableIngestorFactory.from_connection_type(
+                conn_type=conn.type,
                 engine=engine,
                 table=metadata.table_name,
                 load_timestamp=datetime.now(UTC),

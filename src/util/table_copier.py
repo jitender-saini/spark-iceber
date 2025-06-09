@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import ClassVar
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.sql.elements import TextClause
 
+from util.connection_factory import ConnectionType
 from util.logging import get_logger
 
 log = get_logger(__name__)
@@ -111,8 +113,9 @@ class DuckDBTableIngestor(TableIngestor):
         load_timestamp: datetime,
         primary_keys: list[str],
         range_column: str,
+        temp_schema: str | None = None,
     ):
-        super().__init__(engine, table, load_timestamp, primary_keys, range_column)
+        super().__init__(engine, table, load_timestamp, primary_keys, range_column, temp_schema)
 
     def _ingest_to_temp_table(self, dump_path: str) -> list[TextClause]:
         return [
@@ -132,8 +135,9 @@ class PostgresTableIngestor(TableIngestor):
         load_timestamp: datetime,
         primary_keys: list[str],
         range_column: str,
+        temp_schema: str | None = None,
     ):
-        super().__init__(engine, table, load_timestamp, primary_keys, range_column)
+        super().__init__(engine, table, load_timestamp, primary_keys, range_column, temp_schema)
 
     def _ingest_dump_to_temp_table(self, dump_path: str) -> None:
         ingest_stmts = self._ingest_to_temp_table(dump_path)
@@ -150,3 +154,33 @@ class PostgresTableIngestor(TableIngestor):
 
     def _ingest_to_temp_table(self, dump_path: str) -> list[TextClause]:
         return [text(f"COPY {self.temp_table} FROM '{dump_path}' DELIMITER '|' CSV HEADER;")]
+
+
+class TableIngestorFactory:
+    _ingestor_map: ClassVar[dict[ConnectionType, type[TableIngestor]]] = {
+        ConnectionType.DUCKDB: DuckDBTableIngestor,
+        ConnectionType.POSTGRES: PostgresTableIngestor,
+    }
+
+    @staticmethod
+    def from_connection_type(
+        conn_type: ConnectionType,
+        engine: Engine,
+        table: str,
+        load_timestamp: datetime,
+        primary_keys: list[str],
+        range_column: str,
+        temp_schema: str | None = None,
+    ) -> 'TableIngestor':
+        try:
+            ingestor_cls = TableIngestorFactory._ingestor_map[conn_type]
+        except KeyError as err:
+            raise ValueError(f'Unsupported connection type: {conn_type}') from err
+        return ingestor_cls(
+            engine=engine,
+            table=table,
+            load_timestamp=load_timestamp,
+            primary_keys=primary_keys,
+            range_column=range_column,
+            temp_schema=temp_schema,
+        )

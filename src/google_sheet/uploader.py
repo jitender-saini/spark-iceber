@@ -19,7 +19,7 @@ class JobConfig(BaseModel):
     columns: list[str]
     where_clause: str | None = None
     limit: int | None = 1000
-    duckdb_uri: AnyUrl
+    db_uri: AnyUrl
     gs_secret_name: str
 
 

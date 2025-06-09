@@ -75,3 +75,7 @@ python-submit-db script *args="":
 dbuild:
     uv pip compile pyproject.toml -o requirements.txt && \
     docker build -t {{ python_submit_service }} .
+
+
+postgres-start:
+    docker compose up postgres
