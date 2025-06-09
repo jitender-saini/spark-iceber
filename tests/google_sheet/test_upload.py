@@ -2,14 +2,16 @@ from decimal import Decimal
 
 import sqlalchemy as sa
 
-from google_sheet.upload import UploadGoogleSheetJob
+from google_sheet.uploader import JobConfig, UploadGoogleSheetJob
+from util.config import InMemoryBookmarkUpdater
 from util.connection_factory import DuckDBConnection
 from util.google_sheet import FakeGoogleSheet
 
 TABLE_NAME = 'gs_temp'
 SCHEMA_NAME = 'main'
-SHEET_URL = 'https://docs.google.com/spreadsheets/d/example/edit'
+SHEET_URL = 'https://docs.google.com/spreadsheets/d/1AQ5M7bK9ceHkLBu-UrtrMc9KuJNRXibVFW2V0v7vk4I/edit'
 WORKSHEET_NAME = 'test-worksheet'
+job_config = JobConfig
 
 
 def test_upload_google_sheet_job(duckdb_connection: DuckDBConnection):
@@ -23,13 +25,7 @@ def test_upload_google_sheet_job(duckdb_connection: DuckDBConnection):
     uploader = UploadGoogleSheetJob(
         google_sheet=google_sheet,
         connection=duckdb_connection,
-        sheet_url=SHEET_URL,
-        worksheet_name=WORKSHEET_NAME,
-        schema_name=SCHEMA_NAME,
-        table_name=TABLE_NAME,
-        columns=['name', 'score', 'date'],
-        where_clause='where score > 70',
-        limit=10,
+        update_bookmark=InMemoryBookmarkUpdater,
     )
 
     uploader.run()

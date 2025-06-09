@@ -23,7 +23,7 @@ class JobConfig(BaseModel):
     gs_secret_name: str
 
 
-class UploadJob:
+class UploadGoogleSheetJob:
     def __init__(
         self,
         google_sheet: GoogleSheet,

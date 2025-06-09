@@ -8,9 +8,8 @@ from pydantic import AnyUrl, BaseModel
 
 from util.config import UpdateBookmark
 from util.google_sheet import GoogleSheet
-from util.local_env import TEMP_PATH
 from util.logging import get_logger
-from util.table_copier import DuckDBTableIngestor
+from util.table_copier import TableIngestor
 
 log = get_logger(__name__)
 
@@ -35,8 +34,9 @@ class IngestJob:
         self,
         google_sheet: GoogleSheet,
         config: JobConfig,
-        table_ingestor: DuckDBTableIngestor,
+        table_ingestor: TableIngestor,
         update_bookmark: UpdateBookmark,
+        temp_dir: str,
         custom_processor: Callable[[pl.DataFrame], pl.DataFrame] | None = None,
     ):
         self.google_sheet = google_sheet
@@ -44,6 +44,7 @@ class IngestJob:
         self.config = config
         self.table_ingestor = table_ingestor
         self.update_bookmark = update_bookmark
+        self.temp_dir = temp_dir
         self.custom_processor = custom_processor
 
     def run(self) -> None:
@@ -52,9 +53,13 @@ class IngestJob:
         if df.is_empty():
             log.info('No data to ingest')
             return
-        df.write_parquet(f'{TEMP_PATH}/{self.config.table_name.replace(".", "_")}.parquet')
+        dump_path = f'{self.temp_dir}/{self.config.table_name.replace(".", "_")}.csv'
+        # df.write_parquet(f'{TEMP_PATH}/{self.config.table_name.replace(".", "_")}.parquet')
+        df.write_csv(dump_path, separator='|', null_value=None)
         log.info('Saved temp files!')
-        self.table_ingestor.execute(TEMP_PATH)
+        self._create_temp_table(df)
+        log.info(f'Created temporary table {self.table_ingestor.temp_table}')
+        self.table_ingestor.execute(dump_path)
         log.info(f'Ingested data for table {self.config.table_name}!')
         self.update_bookmark(self.utc_now)
         log.info('Updated bookmark: %s', self.utc_now)
@@ -71,6 +76,12 @@ class IngestJob:
             duplicates = [col for col in df.columns if df.columns.count(col) > 1]
             raise ValueError(f'Found duplicate columns: {duplicates}')
         return df
+
+    def _create_temp_table(self, df: pl.DataFrame):
+        log.info(f'Creating temporary table {self.table_ingestor.temp_table}')
+        df = df.remove()
+        with self.table_ingestor.engine.connect() as conn:
+            df.write_database(self.table_ingestor.temp_table, connection=conn, if_table_exists='replace')
 
     @staticmethod
     def _rename_cols(cols: list[str]) -> dict[str, str]:

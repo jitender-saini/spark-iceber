@@ -1,6 +1,6 @@
 import sys
 
-from google_sheet.uploader import JobConfig, UploadJob
+from google_sheet.uploader import JobConfig, UploadGoogleSheetJob
 from util.config import ConfigFactory
 from util.connection_factory import ConnectionFactory
 from util.google_sheet import GoogleSheetFactory
@@ -19,7 +19,7 @@ def main(config_uri: str) -> None:
     google_sheet = GoogleSheetFactory.from_credential_json(secret)
     connection = ConnectionFactory.from_uri(str(config.db_uri))
 
-    job = UploadJob(
+    job = UploadGoogleSheetJob(
         google_sheet=google_sheet,
         connection=connection,
         config=config,

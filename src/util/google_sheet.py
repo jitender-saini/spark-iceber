@@ -1,5 +1,6 @@
 import re
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import gspread
 import polars as pl
@@ -69,3 +70,23 @@ class RemoteGoogleSheet(GoogleSheet):
         ).with_columns(
             [pl.col(col).dt.strftime('%Y-%m-%d %H:%M:%S') for col in df.select(pl.col(pl.Datetime)).columns],
         )
+
+
+class FakeGoogleSheet(GoogleSheet):
+    def __init__(self):
+        self.spreadsheets = defaultdict(dict)
+
+    def get_worksheet(self, url: str, worksheet_name: str) -> list[list[str]]:
+        df = self.spreadsheets[url][worksheet_name]
+        return [df.columns, *[list(r) for r in df.rows()]]
+
+    def update_worksheet(self, url: str, worksheet_name: str, df: pl.DataFrame) -> None:
+        self.spreadsheets[url][worksheet_name] = format_temporal_columns(df)
+
+
+def format_temporal_columns(df: pl.DataFrame) -> pl.DataFrame:
+    return df.with_columns(
+        [pl.col(col).dt.strftime('%Y-%m-%d') for col in df.select(pl.col(pl.Date)).columns],
+    ).with_columns(
+        [pl.col(col).dt.strftime('%Y-%m-%d %H:%M:%S') for col in df.select(pl.col(pl.Datetime)).columns],
+    )

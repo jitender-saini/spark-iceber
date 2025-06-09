@@ -1,3 +1,5 @@
+import os
+import shutil
 import sys
 from datetime import UTC, datetime
 
@@ -7,9 +9,10 @@ from google_sheet.ingestor import IngestJob, JobConfig
 from util.config import ConfigFactory
 from util.connection_factory import ConnectionFactory
 from util.google_sheet import GoogleSheetFactory
+from util.local_env import TEMP_PATH
 from util.logging import configure_logging, get_logger, log_execution_time
 from util.secret_manager import SecretManager
-from util.table_copier import DuckDBTableIngestor
+from util.table_copier import TableIngestorFactory
 
 configure_logging()
 log = get_logger(__name__)
@@ -32,7 +35,11 @@ def main(config_uri: str) -> None:
     secret = SecretManager().get_secret(config.gs_secret_name)
     google_sheet = GoogleSheetFactory.from_credential_json(secret)
     conn = ConnectionFactory.from_uri(str(config.db_uri))
+    temp_dir = f'{TEMP_PATH}/google_sheet'
     log.info('Job args: %s', config)
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+
     if not config.is_active:
         log.info('Job is not active, skipping')
         return
@@ -40,7 +47,8 @@ def main(config_uri: str) -> None:
     if config.table_name == 'etl.restaurant':
         custom_processor = transform_data
     with conn.get_sqlalchemy_engine() as engine:
-        table_ingestor = DuckDBTableIngestor(
+        table_ingestor = TableIngestorFactory.from_connection_type(
+            conn_type=conn.type,
             engine=engine,
             table=config.table_name,
             load_timestamp=datetime.now(UTC),
@@ -52,9 +60,13 @@ def main(config_uri: str) -> None:
             config=config,
             table_ingestor=table_ingestor,
             update_bookmark=config_repo.update,
+            temp_dir=temp_dir,
             custom_processor=custom_processor,
         )
         job.run()
+
+    if os.path.isdir(temp_dir):
+        shutil.rmtree(temp_dir)
 
 
 if __name__ == '__main__':
