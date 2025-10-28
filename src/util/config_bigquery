@@ -1,0 +1,283 @@
+from __future__ import annotations
+
+import json
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from enum import Enum
+from typing import TypeVar
+from urllib.parse import parse_qs, urlparse
+
+from pydantic import BaseModel, constr, field_validator
+
+from util.bigquery import BigQuery
+from util.connection_factory import Connection
+from util.logging import get_logger
+
+log = get_logger(__name__)
+
+ConfigType = TypeVar('ConfigType', bound=BaseModel)
+Bookmark = datetime | int
+
+
+class JobLoadType(Enum):
+    FULL_REFRESH = 'full_refresh'
+    INCREMENTAL = 'incremental'
+
+
+class BaseJobConfig(BaseModel):
+    """
+    Base configuration class for all job types.
+
+    Common fields across all data ingestion jobs:
+    - BigQuery destination (table_name, dataset_name)
+    - Orchestration metadata (airflow_dag_id)
+    - Incremental loading (bookmark, bookmark_column, lookback_days)
+    - Silver layer reference (silver_cleaned_table)
+
+    The bookmark field is automatically adjusted by lookback_days after initialization.
+    """
+
+    table_name: constr(strip_whitespace=True, min_length=1)
+    dataset_name: constr(strip_whitespace=True, min_length=1)
+    airflow_dag_id: constr(strip_whitespace=True, min_length=1)
+    bookmark_column: constr(strip_whitespace=True, min_length=1)
+    bookmark: datetime
+    silver_cleaned_table: constr(strip_whitespace=True, min_length=1) | None = None
+    lookback_days: int = 0
+    load_type: JobLoadType
+    enabled: bool
+
+    @field_validator('lookback_days')
+    @classmethod
+    def validate_lookback_days(cls, days: int) -> int:
+        if days < 0:
+            raise ValueError('lookback_days must be non-negative')
+        return days
+
+    @field_validator('bookmark')
+    @classmethod
+    def ensure_utc_timezone(cls, dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt
+
+    def model_post_init(self, __context):
+        """Adjust bookmark in-place after initialization based on lookback_days."""
+        if self.lookback_days > 0:
+            original_bookmark = self.bookmark
+            self.bookmark = self.bookmark - timedelta(days=self.lookback_days)
+            log.info(f'Applied lookback of {self.lookback_days} days: {original_bookmark} -> {self.bookmark}')
+        super().model_post_init(__context)
+
+
+class ConfigReader(ABC):
+    @abstractmethod
+    def get(self, config_class: type[ConfigType]) -> ConfigType:
+        pass
+
+
+class BookmarkUpdater(ABC):
+    @abstractmethod
+    def update(self, new_bookmark: Bookmark) -> None:
+        pass
+
+
+class ConfigRepositoryType(Enum):
+    FILE = 'file'
+    BIGQUERY = 'bq'
+
+
+class ConfigRepository(ConfigReader, BookmarkUpdater, ABC):
+    @property
+    @abstractmethod
+    def type(self) -> ConfigRepositoryType:
+        pass
+
+
+UpdateBookmark = Callable[[datetime], None]
+
+
+class ConfigFactory:
+    @staticmethod
+    def from_uri(uri: str, db_conn: Connection | None = None) -> ConfigRepository:
+        parsed_uri = urlparse(uri)
+        if parsed_uri.scheme == 'file':
+            return FileConfigRepository(parsed_uri.path)
+        elif parsed_uri.scheme == 'bq':
+            return BigQueryConfigRepository.from_uri(uri, db_conn)
+        else:
+            raise ValueError(f'Unsupported URI scheme: {parsed_uri.scheme}')
+
+
+class FileConfigRepository(ConfigRepository):
+    def __init__(self, file_name: str):
+        self.file_name = file_name
+
+    @property
+    def type(self) -> ConfigRepositoryType:
+        return ConfigRepositoryType.FILE
+
+    def get(self, config_class: type[ConfigType]) -> ConfigType:
+        config = self._read_config()
+        return config_class(**config)
+
+    def update(self, new_bookmark: Bookmark) -> None:
+        config = self._read_config()
+        self._write_config(config | {'bookmark': _serialize_bookmark(new_bookmark)})
+        log.info(f'Bookmark updated to {new_bookmark}')
+
+    def _read_config(self):
+        with open(self.file_name) as file:
+            return json.load(file)
+
+    def _write_config(self, config):
+        with open(self.file_name, 'w') as file:
+            json.dump(config, file, indent=2)
+
+
+def _serialize_bookmark(bookmark: Bookmark):
+    return bookmark.isoformat() if isinstance(bookmark, datetime) else bookmark
+
+
+def no_op_update_bookmark(_bookmark: Bookmark) -> None:
+    pass
+
+
+class InMemoryBookmarkUpdater:
+    def __init__(self):
+        self.bookmark: Bookmark | None = None
+
+    def update(self, new_bookmark: Bookmark) -> None:
+        self.bookmark = new_bookmark
+        log.info(f'Bookmark updated to {new_bookmark}')
+
+
+class BigQueryConfigRepository(ConfigRepository):
+    """
+    BigQuery-based configuration repository with hybrid schema (structured + JSON).
+
+    URI format: bq://project_id/dataset_id/table_name?config_id=identifier
+
+    Example: bq://cm-data-dev/metadata/ingestion_configurations?config_id=bronze.jira_issues
+
+    BigQuery Table Schema (Hybrid Design):
+        - config_id (STRING): Primary key, format: dataset_name.table_name
+        - dataset_name (STRING): Computed from config_id (queryable)
+        - table_name (STRING): Computed from config_id (queryable)
+        - airflow_dag_id (STRING): Airflow DAG identifier
+        - bookmark_column (STRING): Column for incremental loading
+        - bookmark (TIMESTAMP): Last processed timestamp
+        - lookback_days (INT64): Days to look back from bookmark
+        - silver_cleaned_table (STRING): Silver layer table reference
+        - load_type (STRING): Job load type (full_refresh or incremental)
+        - additional_metadata (JSON): Job-specific configuration
+        - enabled (BOOLEAN): Whether job is enabled
+        - created_at (TIMESTAMP): Creation timestamp
+        - updated_at (TIMESTAMP): Last modification timestamp
+    """
+
+    def __init__(self, project_id: str, dataset_id: str, table_name: str, config_id: str, bq_client: BigQuery | None = None):
+        self.project_id = project_id
+        self.dataset_id = dataset_id
+        self.table_name = table_name
+        self.config_id = config_id
+        self._bq_client = bq_client
+
+    @property
+    def type(self) -> ConfigRepositoryType:
+        return ConfigRepositoryType.BIGQUERY
+
+    @classmethod
+    def from_uri(cls, uri: str, bq_client: BigQuery | None = None) -> BigQueryConfigRepository:
+        parsed_uri = urlparse(uri)
+
+        project_id = parsed_uri.netloc
+        if not project_id:
+            raise ValueError('BigQuery URI must specify project_id as netloc: bq://project_id/...')
+
+        path_parts = [p for p in parsed_uri.path.split('/') if p]
+        expected_path_parts = 2
+        if len(path_parts) != expected_path_parts:
+            raise ValueError('BigQuery URI path must be /dataset_id/table_name')
+        dataset_id, table_name = path_parts
+
+        query_params = parse_qs(parsed_uri.query)
+        if 'config_id' not in query_params:
+            raise ValueError('BigQuery URI must specify config_id query parameter: ?config_id=identifier')
+        config_id = query_params['config_id'][0]
+
+        return cls(project_id=project_id, dataset_id=dataset_id, table_name=table_name, config_id=config_id, bq_client=bq_client)
+
+    def get(self, config_class: type[ConfigType]) -> ConfigType:
+        # self.ensure_table_exists()
+        query = f"""
+            SELECT
+                SPLIT(config_id, '.')[SAFE_OFFSET(0)] AS dataset_name,
+                SPLIT(config_id, '.')[SAFE_OFFSET(1)] AS table_name,
+                airflow_dag_id,
+                bookmark_column,
+                bookmark,
+                lookback_days,
+                silver_cleaned_table,
+                load_type,
+                enabled,
+                additional_metadata
+            FROM `{self.project_id}.{self.dataset_id}.{self.table_name}`
+            WHERE config_id = @config_id
+            LIMIT 1
+        """
+
+        params = [{'name': 'config_id', 'type': 'STRING', 'value': self.config_id}]
+        result = self._bq_client.select_statement(query, params=params)
+
+        if result.is_empty():
+            raise ValueError(f'Config with id "{self.config_id}" not found')
+
+        row = result.to_dicts()[0]
+
+        # Extract additional_metadata JSON and merge with base fields
+        additional_metadata = row.pop('additional_metadata', {})
+        if isinstance(additional_metadata, str):
+            additional_metadata = json.loads(additional_metadata)
+
+        # Merge base fields + job-specific metadata
+        combined_config = {**row, **additional_metadata}
+
+        return config_class(**combined_config)
+
+    def update(self, new_bookmark: Bookmark) -> None:
+        update_query = f"""
+            UPDATE `{self.project_id}.{self.dataset_id}.{self.table_name}`
+            SET bookmark = @bookmark,
+                updated_at = CURRENT_TIMESTAMP()
+            WHERE config_id = @config_id
+        """
+
+        bookmark_value = new_bookmark.isoformat() if isinstance(new_bookmark, datetime) else new_bookmark
+        update_params = [
+            {'name': 'config_id', 'type': 'STRING', 'value': self.config_id},
+            {'name': 'bookmark', 'type': 'TIMESTAMP', 'value': bookmark_value},
+        ]
+
+        self._bq_client.execute_query(update_query, params=update_params)
+        log.info(f'Bookmark updated to {new_bookmark} in BigQuery for config_id: {self.config_id}')
+
+    def ensure_table_exists(self) -> None:
+        create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS `{self.project_id}.{self.dataset_id}.{self.table_name}` (
+                config_id STRING PRIMARY KEY NOT ENFORCED,
+                bookmark_column STRING NOT NULL,
+                bookmark TIMESTAMP NOT NULL,
+                enabled BOOLEAN DEFAULT TRUE,
+                lookback_days INT64 DEFAULT 0,
+                load_type STRING NOT NULL,
+                additional_metadata JSON NOT NULL,
+                airflow_dag_id STRING NOT NULL,
+                silver_cleaned_table STRING,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+            )
+        """
+        self._bq_client.execute_query(create_table_sql)
+        log.info(f'Ensured table exists: {self.project_id}.{self.dataset_id}.{self.table_name}')
